@@ -20,8 +20,13 @@ extern char read_port(unsigned short port);
 extern void write_port(unsigned short port, unsigned char data);
 extern void load_idt(unsigned long *idt_ptr);
 
+char* command_names[] = {"ls", "echo"};
+unsigned int number_of_commands = sizeof(command_names) / sizeof(char*);
+
 /* current cursor location */
-unsigned int current_loc = 0;
+unsigned int current_location = 0;
+// Location of start of user input
+unsigned int INPUT_LOCATION = 0;
 /* video memory begins at address 0xb8000 */
 char *vidptr = (char*)0xb8000;
 
@@ -99,25 +104,70 @@ void kprint(const char *str)
 {
 	unsigned int i = 0;
 	while (str[i] != '\0') {
-		vidptr[current_loc++] = str[i++];
-		vidptr[current_loc++] = 0x07;
+		vidptr[current_location++] = str[i++];
+		vidptr[current_location++] = 0x07;
+	}
+}
+
+void kprint_line(const char *str, unsigned int line, unsigned int gap, unsigned int offset) {
+	unsigned int i = 0;
+	while (str[i] != '\0') {
+		unsigned int index = (i+offset)/gap;
+		vidptr[line*COLUMNS_IN_LINE*BYTES_FOR_EACH_ELEMENT+index*2] = str[i];
+		vidptr[line*COLUMNS_IN_LINE*BYTES_FOR_EACH_ELEMENT+index*2+1] = 0x07;
+		i += gap;
 	}
 }
 
 void kprint_newline(void)
 {
 	unsigned int line_size = BYTES_FOR_EACH_ELEMENT * COLUMNS_IN_LINE;
-	current_loc = current_loc + (line_size - current_loc % (line_size));
+	current_location = current_location + (line_size - current_location % (line_size));
 }
 
 void clear_screen(void)
 {
 	unsigned int i = 0;
 	while (i < SCREENSIZE) {
-		vidptr[i++] = ' ';
+		vidptr[i++] = '\0';
 		vidptr[i++] = 0x07;
 	}
 }
+
+int is_equal(char* a, char* b) {
+	kprint_line(a, 2, 2, 0);
+	kprint_line(b, 2, 1, 10);
+
+	while (*a != '\0' && *b != '\0') {
+		if (*a != *b) {
+			return 0;
+		}
+
+		a++;
+		a++;
+		b++;
+	}
+	
+	return (*a == ' ' || *a == '\0') && *b == '\0';
+}
+
+void get_command_type(void) {
+	unsigned int start_of_command = INPUT_LOCATION;
+	unsigned int command = (2 >> number_of_commands) - 1;
+	unsigned int i = 0;
+	for (int j = 0; j < number_of_commands; j++) {
+		if (is_equal(vidptr+start_of_command, command_names[j])) {
+			kprint_line(command_names[j], j+10, 1, 0);
+		}
+	}
+}
+
+void handle_enter_press(void) {
+	const char* str = "test";
+	kprint_line(str, 9, 2, 0);
+	get_command_type();
+}
+
 
 void keyboard_handler_main(void)
 {
@@ -135,22 +185,24 @@ void keyboard_handler_main(void)
 			return;
 
 		if(keycode == ENTER_KEY_CODE) {
-			kprint_newline();
+			// kprint_newline();
+			handle_enter_press();
 			return;
 		}
 
-		vidptr[current_loc++] = keyboard_map[(unsigned char) keycode];
-		vidptr[current_loc++] = 0x07;
+		vidptr[current_location++] = keyboard_map[(unsigned char) keycode];
+		vidptr[current_location++] = 0x07;
 	}
 }
 
 void kmain(void)
 {
-	const char *str = "my first kernel with keyboard support";
+	const char *str = "cool kernel>";
 	clear_screen();
 	kprint(str);
-	kprint_newline();
-	kprint_newline();
+	INPUT_LOCATION = current_location;
+	// kprint_newline();
+	// kprint_newline();
 
 	idt_init();
 	kb_init();
