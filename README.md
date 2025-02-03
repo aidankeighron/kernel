@@ -1,4 +1,4 @@
-# kernel
+# Kernel
 Basic kernel project
 
 
