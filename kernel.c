@@ -20,13 +20,15 @@ extern char read_port(unsigned short port);
 extern void write_port(unsigned short port, unsigned char data);
 extern void load_idt(unsigned long *idt_ptr);
 
-char* command_names[] = {"ls", "echo"};
+char* command_names[] = {"ls", "echo", "color"};
 unsigned int number_of_commands = sizeof(command_names) / sizeof(char*);
 
 // Current cursor location
 unsigned int current_location = 0;
 // Location of start of user input
 unsigned int INPUT_LOCATION = 0;
+// Color
+unsigned int current_color = 0x07;
 
 /* video memory begins at address 0xb8000 */
 char *vidptr = (char*)0xb8000;
@@ -106,7 +108,7 @@ void kprint(const char *str)
 	unsigned int i = 0;
 	while (str[i] != '\0') {
 		vidptr[current_location++] = str[i++];
-		vidptr[current_location++] = 0x07;
+		vidptr[current_location++] = current_color;
 	}
 }
 
@@ -131,7 +133,7 @@ void clear_screen(void)
 	unsigned int i = 0;
 	while (i < SCREENSIZE) {
 		vidptr[i++] = '\0';
-		vidptr[i++] = 0x07;
+		vidptr[i++] = current_color;
 	}
 }
 
@@ -147,6 +149,34 @@ int is_equal(char* a, char* b) {
 	}
 	
 	return (*a == ' ' || *a == '\0') && *b == '\0';
+}
+
+int char_to_int(char ch) {
+	switch (ch)
+	{
+	case '0':
+		return 0;
+	case '1':
+		return 1;
+	case '2':
+		return 2;
+	case '3':
+		return 3;
+	case '4':
+		return 4;
+	case '5':
+		return 5;
+	case '6':
+		return 6;
+	case '7':
+		return 7;
+	case '8':
+		return 8;
+	case '9':
+		return 9;
+	default:
+		return 0;
+	}
 }
 
 void get_command_type(void) {
@@ -166,11 +196,20 @@ void get_command_type(void) {
 				break;
 			case 2:	
 				// color
+				char* start_of_content = vidptr+start_of_command+6*2;
+				int foreground = char_to_int(*start_of_content);
+				int background = char_to_int(*(start_of_content+2));
+				
+				current_color = background*16 + foreground;
+				unsigned int i = 0;
+				while (i < SCREENSIZE) {
+					i++;
+					vidptr[i++] = current_color;
+				}
 				break;
 			default:
 				break;
 			}
-			// kprint_line(command_names[j], j+10, 1, 0);
 		}
 	}
 }
@@ -181,7 +220,7 @@ void handle_enter_press(void) {
 	unsigned int start_of_command = INPUT_LOCATION;
 	for (int i = start_of_command; i < COLUMNS_IN_LINE; i += 2) {
 		vidptr[i] = '\0';
-		vidptr[i+1] = 0x07;
+		vidptr[i+1] = current_color;
 	}
 	current_location = start_of_command;
 }
@@ -209,14 +248,14 @@ void keyboard_handler_main(void)
 
 		if (keycode == 14) {
 			if (current_location > INPUT_LOCATION) {
-				vidptr[--current_location] = 0x07;
+				vidptr[--current_location] = current_color;
 				vidptr[--current_location] = '\0';
 			}
 			return;
 		}
 
 		vidptr[current_location++] = keyboard_map[(unsigned char) keycode];
-		vidptr[current_location++] = 0x07;
+		vidptr[current_location++] = current_color;
 	}
 }
 
