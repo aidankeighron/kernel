@@ -23,10 +23,11 @@ extern void load_idt(unsigned long *idt_ptr);
 char* command_names[] = {"ls", "echo"};
 unsigned int number_of_commands = sizeof(command_names) / sizeof(char*);
 
-/* current cursor location */
+// Current cursor location
 unsigned int current_location = 0;
 // Location of start of user input
 unsigned int INPUT_LOCATION = 0;
+
 /* video memory begins at address 0xb8000 */
 char *vidptr = (char*)0xb8000;
 
@@ -135,9 +136,6 @@ void clear_screen(void)
 }
 
 int is_equal(char* a, char* b) {
-	kprint_line(a, 2, 2, 0);
-	kprint_line(b, 2, 1, 10);
-
 	while (*a != '\0' && *b != '\0') {
 		if (*a != *b) {
 			return 0;
@@ -157,15 +155,35 @@ void get_command_type(void) {
 	unsigned int i = 0;
 	for (int j = 0; j < number_of_commands; j++) {
 		if (is_equal(vidptr+start_of_command, command_names[j])) {
-			kprint_line(command_names[j], j+10, 1, 0);
+			switch (j)
+			{
+			case 0:
+				// ls
+				break;
+			case 1:	
+				// echo
+				kprint_line(vidptr+start_of_command+5*2, 1, 2, 0);
+				break;
+			case 2:	
+				// color
+				break;
+			default:
+				break;
+			}
+			// kprint_line(command_names[j], j+10, 1, 0);
 		}
 	}
 }
 
 void handle_enter_press(void) {
-	const char* str = "test";
-	kprint_line(str, 9, 2, 0);
 	get_command_type();
+	// Clear input
+	unsigned int start_of_command = INPUT_LOCATION;
+	for (int i = start_of_command; i < COLUMNS_IN_LINE; i += 2) {
+		vidptr[i] = '\0';
+		vidptr[i+1] = 0x07;
+	}
+	current_location = start_of_command;
 }
 
 
@@ -185,8 +203,15 @@ void keyboard_handler_main(void)
 			return;
 
 		if(keycode == ENTER_KEY_CODE) {
-			// kprint_newline();
 			handle_enter_press();
+			return;
+		}
+
+		if (keycode == 14) {
+			if (current_location > INPUT_LOCATION) {
+				vidptr[--current_location] = 0x07;
+				vidptr[--current_location] = '\0';
+			}
 			return;
 		}
 
@@ -201,8 +226,6 @@ void kmain(void)
 	clear_screen();
 	kprint(str);
 	INPUT_LOCATION = current_location;
-	// kprint_newline();
-	// kprint_newline();
 
 	idt_init();
 	kb_init();
