@@ -20,7 +20,7 @@ extern char read_port(unsigned short port);
 extern void write_port(unsigned short port, unsigned char data);
 extern void load_idt(unsigned long *idt_ptr);
 
-char* command_names[] = {"ls", "echo", "color"};
+char* command_names[] = {"ls", "echo", "color", "./exe"};
 unsigned int number_of_commands = sizeof(command_names) / sizeof(char*);
 
 // Current cursor location
@@ -189,6 +189,7 @@ void get_command_type(void) {
 			{
 			case 0:
 				// ls
+				kprint_line("exe", 1, 1, 0);
 				break;
 			case 1:	
 				// echo
@@ -206,6 +207,9 @@ void get_command_type(void) {
 					i++;
 					vidptr[i++] = current_color;
 				}
+				break;
+			case 3:
+				INPUT_LOCATION += 1;
 				break;
 			default:
 				break;
